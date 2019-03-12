@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name='config_argparse',
     version='0.1',
-    description='class-based config library based on standard ArgumentParser',
+    description='config library based on standard ArgumentParser',
     author='cormoran',
     author_email='cormoran707@gmail.com',
     url='https://github.com/cormoran/config_argparse',
