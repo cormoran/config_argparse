@@ -6,7 +6,7 @@ Config library based on standard ArgumentParser.
 
 **Simple:**
 
-```
+```python3
 from config_argparse import Config
 
 class MyConfig(Config):
@@ -42,7 +42,7 @@ All the values defined as class variables are copied to the instance by `copy.de
 
 This library supports nested config (it generates multiple `ArgumentParser` internally).
 
-```
+```python3
 from config_argparse import Config
 
 class Nest(Config):
@@ -84,7 +84,7 @@ MyConfig().parse_args(['--nest.help'])
 
 You can merge multiple configs by inheriting them.
 
-```
+```python3
 from config_argparse import Config
 
 class ParentA(Config):
@@ -113,7 +113,7 @@ MyConfig().parse_args(['--a', '33'])
 
 You can dynamically build nested configs according to the values in the parent.
 
-```
+```python3
 from config_argparse import Config, Value, DynamicConfig
 
 class ConfigA(Config):
@@ -156,7 +156,7 @@ print(args)
 
 You can use some `ArgumentParser`'s features such as `required`, `choices` by `config_argparse.Value`.
 
-```
+```python3
 from config_argparse import Config, Value
 
 class MyConfig(Config):
