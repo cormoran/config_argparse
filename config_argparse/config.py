@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Callable, List, Any, TypeVar, Union, Generic, Set, Sequence, cast, Iterable, Tuple
+from typing import Optional, Callable, List, Any, TypeVar, Union, Generic, Set, Sequence, cast, Iterable, Tuple, Type
 import argparse
 import copy
 import builtins
@@ -60,7 +60,10 @@ class Value(Generic[T]):
         self.metavar = metavar
 
     def add_argument(
-        self, parser: argparse._ActionsContainer, name: str, dest: str = None
+        self,
+        parser: argparse._ActionsContainer,
+        name: str,
+        dest: str = None,
     ) -> None:
         kwards = {
             "default": self.default,
@@ -111,7 +114,7 @@ class Config:
         parser = argparse.ArgumentParser(
             self.__class__.__name__, allow_abbrev=False
         )
-        self._add_arguments(parser, prefix)
+        self._add_arguments(parser, prefix, namespace)
         if '--' + prefix + 'help' in args:
             parser.print_help()
             parser.exit()
@@ -130,7 +133,8 @@ class Config:
     def _add_arguments(
         self,
         parser: argparse._ActionsContainer,
-        prefix='',
+        prefix: str,
+        namespace: Config,
     ):
         for class_variable in filter(self.is_class_variable, vars(self)):
             name = '--' + prefix + class_variable
@@ -151,6 +155,12 @@ class Config:
                 value.add_argument(parser, name, class_variable)
             else:
                 Value(value).add_argument(parser, name, class_variable)
+
+            if isinstance(getattr(namespace, class_variable, None), Value):
+                setattr(
+                    namespace, class_variable,
+                    getattr(namespace, class_variable).default
+                )
 
     def _parse_config(
         self,
@@ -224,7 +234,7 @@ class DynamicConfig:
         args: List[str],
         prefix: str,
         namespace: Config,
-    ) -> Tuple[Config, Set[str]]:
+    ) -> Tuple[Config, Set[str], Type[Config]]:
         config: Config = self.config_factory(parent_config)
         if not isinstance(config, Config):
             raise Exception(

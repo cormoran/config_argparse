@@ -1,6 +1,6 @@
 import unittest
 import argparse
-from config_argparse import Config, DynamicConfig
+from config_argparse import Config, DynamicConfig, Value
 
 
 class TestConfig(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.float, 10.5, 'float')
         self.assertEqual(cc.bool, True, 'bool')
 
-    def test_list(self):
+    def test_parse_list(self):
 
         class C(Config):
             a = [1, 2, 3]
@@ -95,6 +95,22 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.nest.a, 1, 'should not be overwritten')
         self.assertEqual(cc.nest.nest.a, '10', 'should be overwritten')
 
+    def test_unknown_args(self):
+
+        class Nest(Config):
+            a = 0
+
+        class C(Config):
+            a = 0
+            nest = Nest()
+
+        c = C()
+        with self.assertRaises(Exception):
+            c.parse_args(['--unknown', '10'])
+
+        with self.assertRaises(Exception):
+            c.parse_args(['--nest.b', '10'])
+
     def test_parse_dynamic(self):
 
         class NestA(Config):
@@ -132,6 +148,28 @@ class TestConfig(unittest.TestCase):
 
         self.assertEqual(cc.nest_cfg.b, 100)
 
+    def test_unknown_dynamic_args(self):
+
+        class NestA(Config):
+            a = 'str'
+
+        class NestB(Config):
+            b = 1
+
+        class C(Config):
+            a = 0.1
+            nest = 'a'
+            nest_cfg = DynamicConfig(
+                lambda c: NestA() if c.nest == 'a' else NestB()
+            )
+
+        c = C()
+        with self.assertRaises(Exception):
+            c.parse_args(['--nest', 'a', '--nest_cfg.b', '10'])
+
+        with self.assertRaises(Exception):
+            c.parse_args(['--nest', 'b', '--nest_cfg.a', '10'])
+
     def test_inherit(self):
 
         class CC1(Config):
@@ -168,6 +206,44 @@ class TestConfig(unittest.TestCase):
 
         cc = c.parse_args(['--a', 'foo'])
         self.assertEqual(cc.a, 'foo')
+
+    def test_value(self):
+
+        class C(Config):
+            a = Value(10)
+            b = Value('str')
+            c = Value(1.0)
+            d = Value([1, 2, 3])
+
+        c = C()
+        cc = c.parse_args([])
+        self.assertEqual(cc.a, 10)
+        self.assertEqual(cc.b, 'str')
+        self.assertEqual(cc.c, 1.0)
+        self.assertEqual(cc.d, [1, 2, 3])
+
+        cc = c.parse_args(['--a', '100'])
+        self.assertEqual(cc.a, 100)
+
+    def test_value_required(self):
+
+        class C(Config):
+            a = Value(type=int, required=True)
+
+        c = C()
+        with self.assertRaises(SystemExit):
+            cc = c.parse_args(['--b', 'a'])
+
+    def test_value_choices(self):
+
+        class C(Config):
+            a = Value(type=int, choices=[1, 2])
+
+        c = C()
+        with self.assertRaises(SystemExit):
+            cc = c.parse_args(['--a', '10'])
+        cc = c.parse_args(['--a', '2'])
+        self.assertEqual(cc.a, 2)
 
 
 if __name__ == "__main__":
