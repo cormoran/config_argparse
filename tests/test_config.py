@@ -1,6 +1,6 @@
 import unittest
 import argparse
-from .config import Config, DynamicConfig
+from config_argparse import Config, DynamicConfig
 
 
 class TestConfig(unittest.TestCase):
