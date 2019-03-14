@@ -1,12 +1,11 @@
 import unittest
 import argparse
+from collections import namedtuple
 from config_argparse import Config, DynamicConfig, Value
 
 
 class TestConfig(unittest.TestCase):
-
     def test_parse_args(self):
-
         class C(Config):
             a = 1
 
@@ -19,7 +18,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.a, 100, 'update multiple times works')
 
     def test_parse_basic_types(self):
-
         class C(Config):
             str = 'test'
             int = 1
@@ -42,7 +40,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.bool, True, 'bool')
 
     def test_parse_list(self):
-
         class C(Config):
             a = [1, 2, 3]
 
@@ -53,7 +50,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.a, [1, 3, 5], 'update works')
 
     def test_parse_nested(self):
-
         class Nest(Config):
             a = 1
 
@@ -70,7 +66,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.nest.a, 10, 'should be overwritten')
 
     def test_parse_nested_nested(self):
-
         class NestNest(Config):
             a = 'str'
 
@@ -86,9 +81,7 @@ class TestConfig(unittest.TestCase):
         cc = c.parse_args([])
         self.assertEqual(cc.a, 0.1, 'default value')
         self.assertEqual(cc.nest.a, 1, 'default value in nest')
-        self.assertEqual(
-            cc.nest.nest.a, 'str', 'default value in nest in nest'
-        )
+        self.assertEqual(cc.nest.nest.a, 'str', 'default value in nest in nest')
 
         cc = c.parse_args(['--nest.nest.a', '10'], namespace=cc)
         self.assertEqual(cc.a, 0.1, 'should not be overwritten')
@@ -96,7 +89,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.nest.nest.a, '10', 'should be overwritten')
 
     def test_unknown_args(self):
-
         class Nest(Config):
             a = 0
 
@@ -112,7 +104,6 @@ class TestConfig(unittest.TestCase):
             c.parse_args(['--nest.b', '10'])
 
     def test_parse_dynamic(self):
-
         class NestA(Config):
             a = 'str'
 
@@ -122,24 +113,16 @@ class TestConfig(unittest.TestCase):
         class C(Config):
             a = 0.1
             nest = 'a'
-            nest_cfg = DynamicConfig(
-                lambda c: NestA() if c.nest == 'a' else NestB()
-            )
+            nest_cfg = DynamicConfig(lambda c: NestA() if c.nest == 'a' else NestB())
 
         c = C()
         cc = c.parse_args([])
 
-        self.assertTrue(
-            isinstance(cc.nest_cfg, NestA),
-            'nest_cfg should be NestA, but {}'.format(type(cc.nest_cfg))
-        )
+        self.assertTrue(isinstance(cc.nest_cfg, NestA), 'nest_cfg should be NestA, but {}'.format(type(cc.nest_cfg)))
         self.assertEqual(cc.nest_cfg.a, 'str')
 
         cc = c.parse_args(['--nest', 'b'])
-        self.assertTrue(
-            isinstance(cc.nest_cfg, NestB),
-            'nest_cfg should be NestB, but {}'.format(type(cc.nest_cfg))
-        )
+        self.assertTrue(isinstance(cc.nest_cfg, NestB), 'nest_cfg should be NestB, but {}'.format(type(cc.nest_cfg)))
         self.assertFalse(hasattr(cc.nest_cfg, 'a'))
         self.assertEqual(cc.nest_cfg.b, 1)
 
@@ -149,7 +132,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.nest_cfg.b, 100)
 
     def test_unknown_dynamic_args(self):
-
         class NestA(Config):
             a = 'str'
 
@@ -159,9 +141,7 @@ class TestConfig(unittest.TestCase):
         class C(Config):
             a = 0.1
             nest = 'a'
-            nest_cfg = DynamicConfig(
-                lambda c: NestA() if c.nest == 'a' else NestB()
-            )
+            nest_cfg = DynamicConfig(lambda c: NestA() if c.nest == 'a' else NestB())
 
         c = C()
         with self.assertRaises(Exception):
@@ -171,7 +151,6 @@ class TestConfig(unittest.TestCase):
             c.parse_args(['--nest', 'b', '--nest_cfg.a', '10'])
 
     def test_inherit(self):
-
         class CC1(Config):
             a = 0.1
 
@@ -193,7 +172,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.c, 2)
 
     def test_inherit_overwrite(self):
-
         class CC1(Config):
             a = 0.1
 
@@ -208,7 +186,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.a, 'foo')
 
     def test_value(self):
-
         class C(Config):
             a = Value(10)
             b = Value('str')
@@ -226,7 +203,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.a, 100)
 
     def test_value_required(self):
-
         class C(Config):
             a = Value(type=int, required=True)
 
@@ -235,7 +211,6 @@ class TestConfig(unittest.TestCase):
             cc = c.parse_args(['--b', 'a'])
 
     def test_value_choices(self):
-
         class C(Config):
             a = Value(type=int, choices=[1, 2])
 
@@ -244,6 +219,38 @@ class TestConfig(unittest.TestCase):
             cc = c.parse_args(['--a', '10'])
         cc = c.parse_args(['--a', '2'])
         self.assertEqual(cc.a, 2)
+
+    def test_assign_defaults(self):
+        class C(Config):
+            a = 100
+
+        default = {'a': 1, 'b': 0}
+
+        c = C(default)
+        cc = c.parse_args([])
+        self.assertEqual(cc.a, 1)
+        with self.assertRaises(AttributeError):
+            cc.b
+
+    def test_assign_defaults_nested(self):
+        class C2(Config):
+            a = 100
+
+        class C(Config):
+            a = 100
+            c = C2()
+
+        default = {'a': 1, 'c': {'a': 2}}
+
+        c = C(default)
+        cc = c.parse_args([])
+        self.assertEqual(cc.a, 1)
+        self.assertEqual(cc.c.a, 2)
+
+        default = {'a': 1, 'c': 2}
+        c = C(default)
+        with self.assertRaises(Exception):
+            cc = c.parse_args([])
 
 
 if __name__ == "__main__":
