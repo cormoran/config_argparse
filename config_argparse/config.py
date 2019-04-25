@@ -10,13 +10,19 @@ from .value import Value
 class Config(MutableMapping[str, Any]):
     def __init__(self, defaults=None):
         self._copy_class_variables(self)
-        self._defaults = defaults
+        self._defaults = [defaults]
+        if defaults:
+            self._spread_default_values(defaults)
 
     def _new(self):
         namespace = type(self)()
-        if self._defaults:
-            defaults = copy.deepcopy(self._defaults)
-            self._assign_values(defaults, namespace)
+        for class_variable in self:
+            if isinstance(self[class_variable], Config):
+                namespace[class_variable] = self[class_variable]._new()
+        for defaults in self._defaults:
+            if defaults:
+                defaults = copy.deepcopy(defaults)
+                self._assign_values(defaults, namespace)
         return namespace
 
     def parse_known_args(
@@ -116,14 +122,16 @@ class Config(MutableMapping[str, Any]):
                 left = left & set(l)
         return left
 
+    def _spread_default_values(self, defaults):
+        for class_variable in self:
+            if class_variable in defaults:
+                if isinstance(self[class_variable], (Config, DynamicConfig)):
+                    self[class_variable]._defaults.append(defaults[class_variable])
+
     def _assign_values(self, src: Mapping[str, Any], dest: MutableMapping[str, Any]):
         for class_variable in self:
             if class_variable in src:
-                if isinstance(dest[class_variable], Config):
-                    if not hasattr(src[class_variable], '__iter__'):
-                        raise Exception('default value of {} in {} should be iterable'.format(class_variable, src))
-                    dest[class_variable]._assign_values(src[class_variable], dest[class_variable])
-                else:
+                if not isinstance(dest[class_variable], (Config, DynamicConfig)):
                     dest[class_variable] = src[class_variable]
 
     def __repr__(self):
@@ -173,6 +181,7 @@ class Config(MutableMapping[str, Any]):
 class DynamicConfig:
     def __init__(self, config_factory: Callable[[MutableMapping[str, Any]], Config]):
         self.config_factory = config_factory
+        self._defaults = []
 
     def parse_args(
             self,
@@ -184,5 +193,6 @@ class DynamicConfig:
         config: Config = self.config_factory(parent_config)
         if not isinstance(config, Config):
             raise Exception('DynamicConfig: config_factory should return instance of Config, but returned {}'.format(config))
+        config._defaults.extend(self._defaults)
         namespace, left_args = config.parse_known_args(args, prefix, namespace=namespace)
         return namespace, left_args, config
