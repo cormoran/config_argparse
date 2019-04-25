@@ -169,3 +169,24 @@ MyConfig().parse_args([])
 MyConfig().parse_args(['--weight', '1.0', '--dim', 'foo'])
 # MyConfig: error: argument --dim: invalid choice: 'foo' (choose from 'a', 'b', 'c')
 ```
+
+**Convert to/from dict**
+
+Default values can be set by passing dict like object to `Config::__init__`.
+
+`Config::todict` creates serializable dict (if the config is already parsed).
+
+```python3
+import json
+from config_argparse import Config
+
+class MyConfig(Config):
+    weight = 10.0         # -> .add_argument('--weight', type=float, default=10.0)
+    layers = [10, 20, 30] # -> .add_argument('--layers', type=int, nargs='+', default=[10, 20, 30])
+
+c = MyConfig({'weight': 1.0}).parse_args([])
+c.weight
+# -> 1.0
+c.todict()
+# -> {'weight': 1.0, 'layers': [10, 20, 30]}
+```

@@ -49,6 +49,15 @@ class Config(MutableMapping[str, Any]):
             raise Exception('unknown arguments: {}'.format(left_args))
         return namespace
 
+    def todict(self):
+        res = {}
+        for class_variable in self:
+            if isinstance(self[class_variable], Config):
+                res[class_variable] = self[class_variable].todict()
+            else:
+                res[class_variable] = self[class_variable]
+        return res
+
     def _add_arguments(
             self,
             parser: argparse._ActionsContainer,

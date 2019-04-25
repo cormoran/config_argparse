@@ -252,6 +252,44 @@ class TestConfig(unittest.TestCase):
         with self.assertRaises(Exception):
             cc = c.parse_args([])
 
+    def test_compare(self):
+        class C2(Config):
+            a = 200
+
+        class C(Config):
+            a = 100
+            c = C2()
+
+        c = C()
+        cc1 = c.parse_args(['--c.a', '1'])
+        cc2 = c.parse_args(['--c.a', '1'])
+        c = C()
+        cc3 = c.parse_args(['--c.a', '1'])
+        c = C()
+        cc4 = c.parse_args(['--c.a', '2'])
+        self.assertEqual(cc1, cc2)
+        self.assertEqual(cc2, cc3)
+        self.assertNotEqual(cc4, cc1)
+        self.assertNotEqual(cc4, cc2)
+        self.assertNotEqual(cc4, cc3)
+
+    def test_todict(self):
+        import json
+
+        class C2(Config):
+            a = 100
+
+        class C(Config):
+            a = 100
+            c = C2()
+            c3 = Value(100)
+
+        c = C()
+        cc = c.parse_args(['--c.a', '1'])
+        c2 = C(json.loads(json.dumps(cc.todict())))
+        cc2 = c.parse_args(['--c.a', '1'])
+        self.assertEqual(cc, cc2)
+
 
 if __name__ == "__main__":
     unittest.main()
