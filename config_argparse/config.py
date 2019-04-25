@@ -21,10 +21,12 @@ class Config(MutableMapping[str, Any]):
 
     def parse_known_args(
             self,
-            args: List[str],
+            args: List[str] = None,
             prefix='',
             namespace: MutableMapping[str, Any] = None,
     ) -> Tuple[MutableMapping[str, Any], List[str]]:
+        if args is None:
+            args = []
         if namespace is None:
             namespace = self._new()
 
