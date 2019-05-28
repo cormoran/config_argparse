@@ -7,6 +7,10 @@ import builtins
 T = TypeVar('T')
 
 
+class InferTypeError(Exception):
+    pass
+
+
 class Value(Generic[T]):
     def __init__(
             self,
@@ -19,30 +23,41 @@ class Value(Generic[T]):
             help: str = None,
             metavar: Union[str, Tuple[str, ...]] = None,
     ) -> None:
-
         # infer type
         if type is None:
             if default is not None:
-                if isinstance(default, (list, tuple)):
-                    if len(default) > 0:
-                        type = builtins.type(default[0])
+                if isinstance(default, (list, tuple)) and len(default) > 0:
+                    type = builtins.type(default[0])
                 else:
                     type = builtins.type(default)
-            elif choices is not None:
-                if len(choices) > 0:
-                    type = builtins.type(choices[0])
+            elif choices is not None and len(choices) > 0:
+                type = builtins.type(choices[0])
 
         if type is None:
-            raise Exception('failed to infer type ({} {})'.format(default, choices))
+            raise InferTypeError('failed to infer type ({} {})'.format(default, choices))
+
+        # check type
+        if default is not None:
+            for v in default if isinstance(default, (list, tuple)) else [default]:
+                if not isinstance(v, type):
+                    raise ValueError('type of default value {} is not {}'.format(default, type))
+        if choices is not None:
+            for v in choices:
+                if not isinstance(v, type):
+                    raise ValueError('type of value {} in choices is not {}'.format(default, type))
 
         # set nargs
         if nargs is None:
             if isinstance(default, (list, tuple)):
                 nargs = '+'
 
-        # check
-        if type == bool and default is not False:
-            raise Exception('bool type only supports store_true action.')
+        # check bool
+        if type == bool and default != False:
+            raise ValueError('bool type only supports store_true action.')
+
+        # check required
+        if required and default is not None:
+            raise ValueError('required can be True only if default is None')
 
         self.default = default
         self.type = type
@@ -60,18 +75,19 @@ class Value(Generic[T]):
     ) -> None:
         kwargs: Dict[str, Any] = {
             "default": self.default,
-            "required": self.required,
             "help": self.help,
-            "dest": dest,
         }
         if self.type == bool:
-            kwargs["action"] = cast(argparse.Action, argparse._StoreTrueAction if self.default is False else argparse._StoreFalseAction)
+            kwargs["action"] = cast(argparse.Action, argparse._StoreTrueAction)
         else:
             kwargs["type"] = self.type
             kwargs["nargs"] = self.nargs
             kwargs["choices"] = self.choices
             kwargs["metavar"] = self.metavar
-
+        if dest:
+            kwargs["dest"] = dest
+        if self.required:
+            kwargs["required"] = self.required
         parser.add_argument(name, **kwargs)
 
     def __repr__(self) -> str:
