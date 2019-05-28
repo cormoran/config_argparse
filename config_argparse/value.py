@@ -58,21 +58,21 @@ class Value(Generic[T]):
             name: str,
             dest: str = None,
     ) -> None:
-        kwards: Dict[str, Any] = {
+        kwargs: Dict[str, Any] = {
             "default": self.default,
             "required": self.required,
             "help": self.help,
             "dest": dest,
         }
         if self.type == bool:
-            kwards["action"] = cast(argparse.Action, argparse._StoreTrueAction if self.default is False else argparse._StoreFalseAction)
+            kwargs["action"] = cast(argparse.Action, argparse._StoreTrueAction if self.default is False else argparse._StoreFalseAction)
         else:
-            kwards["type"] = self.type
-            kwards["nargs"] = self.nargs
-            kwards["choices"] = self.choices
-            kwards["metavar"] = self.metavar
+            kwargs["type"] = self.type
+            kwargs["nargs"] = self.nargs
+            kwargs["choices"] = self.choices
+            kwargs["metavar"] = self.metavar
 
-        parser.add_argument(name, **kwards)
+        parser.add_argument(name, **kwargs)
 
     def __repr__(self) -> str:
         res = str(self.default) if not self.required else 'required'

@@ -51,8 +51,8 @@ class Config(MutableMapping[str, Any]):
 
         return namespace, list(left_args)
 
-    def parse_args(self, *args, **kwards) -> MutableMapping[str, Any]:
-        namespace, left_args = self.parse_known_args(*args, **kwards)
+    def parse_args(self, *args, **kwargs) -> MutableMapping[str, Any]:
+        namespace, left_args = self.parse_known_args(*args, **kwargs)
         if len(left_args) > 0:
             raise Exception('unknown arguments: {}'.format(left_args))
         return namespace
