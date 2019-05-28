@@ -13,7 +13,7 @@ class MyConfig(Config):
     weight = 10.0         # -> .add_argument('--weight', type=float, default=10.0)
     layers = [10, 20, 30] # -> .add_argument('--layers', type=int, nargs='+', default=[10, 20, 30])
 
-MyConfig().parse_args([])
+MyConfig()
 # MyConfig:
 #         weight = 10.0
 #         layers = [10, 20, 30]
@@ -52,7 +52,7 @@ class MyConfig(Config):
     a = 'str'
     nest = Nest()  # -> .add_argument('--nest.a', type=int, default=10, dest=`a in nest`)
 
-MyConfig().parse_args([])
+MyConfig()
 # MyConfig:
 #         a = str
 #         nest = Nest:
@@ -96,7 +96,7 @@ class ParentB(Config):
 class MyConfig(ParentA, ParentB):
     c = 'str'
 
-MyConfig().parse_args([])
+MyConfig()
 # MyConfig:
 #         a = 10
 #         b = 10
@@ -131,7 +131,15 @@ class MyConfig(Config):
     lr = 0.1
     epoch = 100
     model = Value('a', choices=list(config_map.keys()))
-    model_cfg = DynamicConfig(lambda c: config_map[c.model]()) # pass function which returns Type[Config]
+    model_cfg = DynamicConfig(lambda c: config_map[c.model]()) # pass function which returns instance of Config
+
+args = MyConfig()
+print(args)
+# MyConfig:
+#         lr = 0.1
+#         epoch = 100
+#         model = a
+#         model_cfg = None # default value of DynamicConfig is None (if auto_load=False)
 
 args = MyConfig().parse_args([])
 print(args)
@@ -140,7 +148,7 @@ print(args)
 #         epoch = 100
 #         model = a
 #         model_cfg = ConfigA:
-#                 a = 1
+#               a = 1
 
 args = MyConfig().parse_args(['--lr', '1', '--model', 'b', '--model_cfg.b', '100'])
 print(args)
@@ -150,6 +158,31 @@ print(args)
 #         model = b
 #         model_cfg = ConfigB:
 #                 b = 100
+```
+
+`DynamicConfig` also supports list of Configs.
+
+```python3
+class ConfigA(Config):
+    a = 1
+
+class MyConfig(Config):
+    models = ['a', 'b', 'c']
+    # pass function which returns list of Config
+    models_cfg = DynamicConfig(lambda c: list(map(lambda x: ConfigA(), c.models)))
+
+args = MyConfig()
+print(args)
+# MyConfig:
+#         models = ['a', 'b', 'c']
+#         models_cfg = None
+print(args.parse_args([]))
+# MyConfig:
+#         models = ['a', 'b', 'c']
+#         models_cfg = [ConfigA:
+#                 a = 1, ConfigA:
+#                 a = 1, ConfigA:
+#                 a = 1]
 ```
 
 **Value:**
@@ -184,7 +217,7 @@ class MyConfig(Config):
     weight = 10.0         # -> .add_argument('--weight', type=float, default=10.0)
     layers = [10, 20, 30] # -> .add_argument('--layers', type=int, nargs='+', default=[10, 20, 30])
 
-c = MyConfig({'weight': 1.0}).parse_args([])
+c = MyConfig({'weight': 1.0})
 c.weight
 # -> 1.0
 c.todict()

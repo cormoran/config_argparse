@@ -5,6 +5,53 @@ from config_argparse import Config, DynamicConfig, Value
 
 
 class TestConfig(unittest.TestCase):
+    def test_basic(self):
+        class C(Config):
+            str = 'test'
+            int = 1
+            float = 1.0
+            bool = False
+
+        c = C()
+        self.assertEqual(c.str, 'test')
+        self.assertEqual(c.int, 1)
+        self.assertEqual(c.float, 1.0)
+        self.assertEqual(c.bool, False)
+
+    def test_nest(self):
+        class C1(Config):
+            c1 = 1
+
+        class C2(Config):
+            c2 = 2
+
+        class C3(Config):
+            c3 = 3
+            c1 = C1()
+
+        class C4(C1, C2):
+            c4 = DynamicConfig(lambda x: C3())
+
+        class C5(C1, C2):
+            c5 = DynamicConfig(lambda x: C3(), auto_load=True)
+
+        self.assertEqual(C3().c1.c1, 1)
+        c = C4()
+        self.assertEqual(c.c1, 1)
+        self.assertEqual(c.c2, 2)
+        self.assertEqual(c.c4, None)
+        self.assertEqual(C5().c5.c3, 3)
+        self.assertEqual(C5().c5.c1.c1, 1)
+
+    def test_multi_dynamic(self):
+        class C1(Config):
+            c1 = 1
+
+        class C2(Config):
+            c2 = DynamicConfig(lambda x: [C1(), C1(), C1()], auto_load=True)
+
+        self.assertEqual(C2().c2, [C1(), C1(), C1()])
+
     def test_parse_args(self):
         class C(Config):
             a = 1
@@ -25,15 +72,7 @@ class TestConfig(unittest.TestCase):
             bool = False
 
         c = C()
-        cc = c.parse_args([
-            '--str',
-            'foo',
-            '--int',
-            '10',
-            '--float',
-            '10.5',
-            '--bool',
-        ])
+        cc = c.parse_args(['--str', 'foo', '--int', '10', '--float', '10.5', '--bool'])
         self.assertEqual(cc.str, 'foo', 'str')
         self.assertEqual(cc.int, 10, 'int')
         self.assertEqual(cc.float, 10.5, 'float')
@@ -194,6 +233,7 @@ class TestConfig(unittest.TestCase):
 
         c = C()
         cc = c.parse_args([])
+
         self.assertEqual(cc.a, 10)
         self.assertEqual(cc.b, 'str')
         self.assertEqual(cc.c, 1.0)
@@ -224,13 +264,14 @@ class TestConfig(unittest.TestCase):
         class C(Config):
             a = 100
 
-        default = {'a': 1, 'b': 0}
+        default = {'a': 1}
 
         c = C(default)
         cc = c.parse_args([])
         self.assertEqual(cc.a, 1)
-        with self.assertRaises(AttributeError):
-            cc.b
+
+        with self.assertRaises(KeyError):
+            C({'b': 1})
 
     def test_assign_defaults_nested(self):
         class C2(Config):
@@ -248,9 +289,28 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cc.c.a, 2)
 
         default = {'a': 1, 'c': 2}
-        c = C(default)
         with self.assertRaises(Exception):
-            cc = c.parse_args([])
+            c = C(default)
+
+    def test_assign_defaults_dynamic(self):
+        class C2(Config):
+            b = 10
+
+        class C(Config):
+            a = DynamicConfig(lambda x: C2())
+
+        self.assertEqual(C({'a': {'b': 100}}).parse_args([]).a.b, 100)
+
+    def test_assign_defaults_multi_dynamic(self):
+        class C2(Config):
+            b = 10
+
+        class C(Config):
+            a = DynamicConfig(lambda x: [C2(), C2()], auto_load=True)
+
+        c = C({'a': [{'b': 100}, {'b': 99}]}).parse_args([])
+        self.assertEqual(c.a[0].b, 100)
+        self.assertEqual(c.a[1].b, 99)
 
     def test_compare(self):
         class C2(Config):

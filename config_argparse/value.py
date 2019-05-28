@@ -16,7 +16,7 @@ class Value(Generic[T]):
             self,
             default: T = None,
             *,
-            type: Callable[[str], T] = None,
+            type: type = None,
             choices: Sequence[T] = None,
             required: bool = False,
             nargs: Union[int, str] = None,
@@ -37,10 +37,6 @@ class Value(Generic[T]):
             raise InferTypeError('failed to infer type ({} {})'.format(default, choices))
 
         # check type
-        if default is not None:
-            for v in default if isinstance(default, (list, tuple)) else [default]:
-                if not isinstance(v, type):
-                    raise ValueError('type of default value {} is not {}'.format(default, type))
         if choices is not None:
             for v in choices:
                 if not isinstance(v, type):
@@ -55,17 +51,23 @@ class Value(Generic[T]):
         if type == bool and default != False:
             raise ValueError('bool type only supports store_true action.')
 
-        # check required
-        if required and default is not None:
-            raise ValueError('required can be True only if default is None')
-
-        self.default = default
         self.type = type
         self.choices = choices
         self.required = required
         self.nargs = nargs
         self.help = help
         self.metavar = metavar
+        self.set_default(default)
+
+    def set_default(self, default):
+        ''' update default value with type checking '''
+        if default is not None:
+            for v in default if isinstance(default, (list, tuple)) else [default]:
+                if not isinstance(v, self.type):
+                    raise ValueError('type of default value {} is not {}'.format(default, self.type))
+        if self.required and default is not None:
+            raise ValueError('required can be True only if default is None')
+        self.default = default
 
     def add_argument(
             self,

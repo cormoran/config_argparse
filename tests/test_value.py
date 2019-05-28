@@ -44,7 +44,7 @@ class TestValue(unittest.TestCase):
                 val = Value(default)
                 parser = argparse.ArgumentParser()
                 val.add_argument(parser, '--val')
-                args = parser.parse_args()
+                args = parser.parse_args([])
                 self.assertEqual(args.val, default)
                 args = parser.parse_args(['--val'] + input)
                 self.assertEqual(args.val, parsed)
