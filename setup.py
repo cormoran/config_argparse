@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='config_argparse',
-    version='0.3.0',
+    version='0.3.1',
     description='config library based on standard ArgumentParser',
     author='cormoran',
     author_email='cormoran707@gmail.com',

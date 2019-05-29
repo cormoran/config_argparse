@@ -83,6 +83,10 @@ class Config(MutableMapping[str, Any]):
             res[name] = getattr(self, name)
             if isinstance(res[name], Config):
                 res[name] = res[name].todict()
+            if isinstance(res[name], (list, tuple)):
+                for i, v in enumerate(res[name]):
+                    if isinstance(v, Config):
+                        res[name][i] = v.todict()
         return res
 
     def _add_arguments(

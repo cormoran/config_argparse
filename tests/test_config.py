@@ -350,6 +350,19 @@ class TestConfig(unittest.TestCase):
         cc2 = c.parse_args(['--c.a', '1'])
         self.assertEqual(cc, cc2)
 
+    def test_dynamic_todict(self):
+        import json
+
+        class C2(Config):
+            a = 100
+
+        class C(Config):
+            a = DynamicConfig(lambda c: [C2(), C2(), C2()])
+
+        c = C().parse_args()
+        c2 = C(json.loads(json.dumps(c.todict()))).parse_args()
+        self.assertEqual(c, c2)
+
 
 if __name__ == "__main__":
     unittest.main()
