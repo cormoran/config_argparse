@@ -16,21 +16,22 @@ class Config(MutableMapping[str, Any]):
     def __init__(self: C, default: Mapping[str, Any] = None):
         self._children: MutableMapping[str, Union[Config, DynamicConfig, Value]] = {}
         self._default: MutableMapping[str, Any] = {}
-        for name, value in _collect_class_variables(self.__class__).items():
+        for name, value in _collect_class_variables(self.__class__).items():  # generates copy of class variables
             if not isinstance(value, (Config, DynamicConfig, Value)):
                 value = Value(value)
-
             self._children[name] = value
 
         self.set_default(default if default is not None else {})
 
     def _reload(self: C):
+        # reload Config & Value first
+        # because they will be used to determine the contents of DynamicConfig
         for name, value in self._children.items():
             if isinstance(value, Config):
                 setattr(self, name, type(value)(value._default))
             elif isinstance(value, Value):
                 setattr(self, name, copy.deepcopy(value.default))
-
+        # reload DynamicConfig
         for name, value in self._children.items():
             if isinstance(value, DynamicConfig):
                 setattr(self, name, value(self))
@@ -110,34 +111,34 @@ class Config(MutableMapping[str, Any]):
             namespace: T,
     ) -> Set[str]:
         left = set(filter(lambda s: s.startswith('--'), args))
+        # we assume Values are already parsed
+        # parse Config
         for class_variable, val in self._children.items():
-            if not isinstance(val, Config):
-                continue
-            dest = prefix + class_variable
-            name = '--' + dest
+            if isinstance(val, Config):
+                dest = prefix + class_variable
+                name = '--' + dest
 
-            sub_namespace, l = val.parse_known_args(
-                args,
-                prefix=dest + '.',
-                namespace=cast(Optional[T], namespace.get(class_variable, None)),
-            )
-            namespace[class_variable] = sub_namespace
-            left = left & set(l)
-
+                sub_namespace, l = val.parse_known_args(
+                    args,
+                    prefix=dest + '.',
+                    namespace=cast(Optional[T], namespace.get(class_variable, None)),
+                )
+                namespace[class_variable] = sub_namespace
+                left = left & set(l)
+        # parse DynamicConfig
         for class_variable, val in self._children.items():
-            if not isinstance(val, DynamicConfig):
-                continue
-            dest = prefix + class_variable
-            name = '--' + dest
+            if isinstance(val, DynamicConfig):
+                dest = prefix + class_variable
+                name = '--' + dest
 
-            sub_namespace2, l, _ = val.parse_args(
-                namespace,
-                args,
-                prefix=dest + '.',
-                namespace=cast(Union[T, List[T], None], namespace.get(class_variable, None)),
-            )
-            namespace[class_variable] = sub_namespace2
-            left = left & set(l)
+                sub_namespace2, l, _ = val.parse_args(
+                    namespace,
+                    args,
+                    prefix=dest + '.',
+                    namespace=cast(Union[T, List[T], None], namespace.get(class_variable, None)),
+                )
+                namespace[class_variable] = sub_namespace2
+                left = left & set(l)
         return left
 
     def __repr__(self):
@@ -173,10 +174,10 @@ class Config(MutableMapping[str, Any]):
 class DynamicConfig():
     def __init__(self, config_factory: Callable[[T], Union[Config, Sequence[Config]]], auto_load=False):
         self.config_factory = config_factory
-        self._defaults: List[Union[dict, List[dict]]] = []
+        self._defaults: List[Union[Mapping[str, Any], List[Mapping[str, Any]]]] = []
         self.auto_load = auto_load
 
-    def set_default(self, values: Union[dict, List[dict]]):
+    def set_default(self, values: Union[Mapping[str, Any], List[Mapping[str, Any]]]):
         self._defaults.append(values)
 
     def parse_args(
@@ -188,56 +189,60 @@ class DynamicConfig():
     ) -> Tuple[Union[T, List[T]], List[str], Union[Config, Sequence[Config]]]:
         configs = self._load(parent_config)
 
-        if len(configs) == 1:
-            ns_list: List[Optional[T]] = [cast(T, namespace)]
-        elif namespace is None:
-            ns_list = [None for _ in configs]
+        if isinstance(configs, Config):
+            assert not isinstance(namespace, list)
+            ns, left_args = configs.parse_known_args(args, prefix, namespace=namespace)
+            return cast(T, ns), left_args, configs
         else:
-            ns_list = cast(List[Optional[T]], namespace)
+            if namespace is None:
+                ns_list: List[Optional[T]] = [None for _ in configs]
+            else:
+                assert isinstance(namespace, list)
+                ns_list = cast(List[Optional[T]], namespace)
 
-        left_args = set(args)
-        for i, config in enumerate(configs):
-            ns, a_left_args = config.parse_known_args(args, prefix, namespace=ns_list[i])
-            ns_list[i] = cast(T, ns)
-            left_args &= set(a_left_args)
-        ns_list2 = cast(List[T], ns_list)
-        if len(configs) > 1:
-            return ns_list2, list(left_args), configs
-        else:
-            return ns_list2[0], list(left_args), configs[0]
+            left_args2 = set(args)
+            for i, config in enumerate(configs):
+                ns, a_left_args = config.parse_known_args(args, prefix, namespace=ns_list[i])
+                ns_list[i] = cast(T, ns)
+                left_args2 &= set(a_left_args)
+            ns_list2 = cast(List[T], ns_list)
+            return ns_list2, list(left_args2), configs
 
     def __call__(self, parent_config: T):
         if not self.auto_load:
             return None
-        configs = self._load(parent_config)
-        return configs if len(configs) > 1 else configs[0]
+        return self._load(parent_config)
 
-    def _load(self, parent_config: T) -> Sequence[Config]:
+    def _load(self, parent_config: T) -> Union[Config, Sequence[Config]]:
         configs = self.config_factory(parent_config)
         defaults = self._defaults
+
         if isinstance(configs, Config):
-            configs = [configs]
-            defaults = [[d] for d in self._defaults]  # type: ignore
+            for default in defaults:
+                assert not isinstance(default, list)
+                configs.set_default(default)
+            return configs
 
         for config in configs:
             if not isinstance(config, Config):
                 raise Exception('DynamicConfig: config_factory should return instance of Config or [Config], but returned {}'.format(config))
+        for default in defaults:
+            assert isinstance(
+                default,
+                list) and len(default) == len(configs), 'DynamicConfig: config_factory returned {} Configs, but length of default {} is {}.'.format(
+                    len(configs), default, len(default))
 
-        for i in range(len(defaults)):
-            if len(defaults[i]) != len(configs):
-                raise Exception('DynamicConfig: config_factory returned {} Configs, but length of default {} is {}.'.format(
-                    len(configs), defaults[i], len(defaults[i])))
-            for config, default in zip(configs, defaults[i]):
-                config.set_default(default)
-
+            for config, a_default in zip(configs, default):
+                config.set_default(a_default)
         return configs
 
 
 def _collect_class_variables(cls):
+    ''' return copy of all class variables which name do not start with underscore '''
     res = {}
     for base in filter(lambda b: issubclass(b, Config), reversed(cls.__bases__)):
         res.update(_collect_class_variables(base))
     for member in cls.__dict__.keys():
         if not member.startswith('_') and not inspect.isfunction(cls.__dict__[member]):
-            res[member] = cls.__dict__[member]
+            res[member] = copy.deepcopy(cls.__dict__[member])
     return res
