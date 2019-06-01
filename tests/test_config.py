@@ -52,6 +52,12 @@ class TestConfig(unittest.TestCase):
 
         self.assertEqual(C2().c2, [C1(), C1(), C1()])
 
+    def test_dynamic_none(self):
+        class C2(Config):
+            c2 = DynamicConfig(lambda x: None, auto_load=True)
+
+        self.assertEqual(C2().c2, None)
+
     def test_parse_args(self):
         class C(Config):
             a = 1

@@ -186,10 +186,12 @@ class DynamicConfig():
             args: List[str],
             prefix: str,
             namespace: Union[T, List[T], None] = None,
-    ) -> Tuple[Union[T, List[T]], List[str], Union[Config, Sequence[Config]]]:
+    ) -> Tuple[Union[T, List[T], None], List[str], Union[Config, Sequence[Config], None]]:
         configs = self._load(parent_config)
-
-        if isinstance(configs, Config):
+        if configs is None:
+            assert namespace is None
+            return None, args, None
+        elif isinstance(configs, Config):
             assert not isinstance(namespace, list)
             ns, left_args = configs.parse_known_args(args, prefix, namespace=namespace)
             return cast(T, ns), left_args, configs
@@ -213,9 +215,14 @@ class DynamicConfig():
             return None
         return self._load(parent_config)
 
-    def _load(self, parent_config: T) -> Union[Config, Sequence[Config]]:
+    def _load(self, parent_config: T) -> Union[Config, Sequence[Config], None]:
         configs = self.config_factory(parent_config)
         defaults = self._defaults
+
+        if configs is None:
+            if len(defaults) > 0:
+                raise Exception('DynamicConfig: config_factory returned None, but default values exist {}'.format(defaults))
+            return None
 
         if isinstance(configs, Config):
             for default in defaults:
