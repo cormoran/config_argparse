@@ -8,8 +8,10 @@ setup(
     author='cormoran',
     author_email='cormoran707@gmail.com',
     url='https://github.com/cormoran/config_argparse',
-    license='mit',
     packages=find_packages(exclude=('tests')),
     install_requires=[],
     test_suite='tests',
+    classifiers=[
+        'License :: OSI Approved :: MIT License',
+    ],
 )
